@@ -39,44 +39,62 @@ Fase 1.
 
 ```mermaid
 flowchart TB
-    subgraph CLIENTES["Clientes"]
+    subgraph USUARIOS["Usuarios"]
         direction LR
-        WEB["Navegador web"]
-        MOV["Navegador / app movil"]
+        WEB["Cliente web<br/>(navegador)"]
+        MOV["Cliente movil<br/>(navegador)"]
+        OPS["Administrador / gerente"]
     end
 
-    subgraph INET["Internet publico"]
-        DNS["DNS<br/>tiendamodagt.com"]
-    end
+    DNS["DNS y dominio<br/>tiendamodagt.com"]
 
-    subgraph CLOUD["Proveedor Cloud — 1 sola instancia (VM Linux), sin firewall"]
+    subgraph HOST["Servidor Cloud unico — VPS Linux (Ubuntu)"]
         direction TB
-        APA["Servidor web Apache 2.4 + PHP 7.4<br/>WordPress 6.1 + WooCommerce 7.9<br/>6 plugins desactualizados con CVE"]
-        UPL["Carpeta de subidas<br/>(comprobantes de pago)<br/>permite ejecutar archivos"]
-        PMA["phpMyAdmin<br/>publicado en internet"]
-        BK["respaldo_tienda.sql<br/>en carpeta web publica"]
-        SSH["Puerto 22 (SSH)<br/>abierto a 0.0.0.0/0"]
-        DB[("MySQL en el MISMO servidor<br/>clientes · pedidos · pagos<br/>sin cifrado en reposo")]
+        subgraph APPL["Capa de aplicacion"]
+            APA["Apache 2.4 + PHP 7.4"]
+            WP["WordPress 6.1 + WooCommerce 7.9<br/>+ plugins de terceros"]
+            MEDIA["Almacenamiento de archivos<br/>uploads (imagenes, comprobantes)"]
+        end
+        subgraph DATA["Capa de datos (mismo host)"]
+            DB[("MySQL 8<br/>productos · clientes · pedidos")]
+        end
+        subgraph MGMT["Administracion"]
+            PMA["phpMyAdmin"]
+            SSH["Acceso SSH"]
+        end
     end
 
-    PAY["Pasarela de pago<br/>Stripe (API externa)"]
+    subgraph EXT["Servicios externos"]
+        direction LR
+        PAY["Stripe<br/>(pagos)"]
+        MAIL["SMTP<br/>(correos de pedidos)"]
+    end
 
-    WEB -->|"HTTP sin TLS"| DNS
-    MOV -->|"HTTP sin TLS"| DNS
+    WEB -->|"HTTP"| DNS
+    MOV -->|"HTTP"| DNS
     DNS --> APA
-    APA --> DB
-    APA --> UPL
-    APA -->|"claves en texto"| PAY
+    APA --> WP
+    WP --> DB
+    WP --> MEDIA
+    WP --> PAY
+    WP --> MAIL
+    OPS -->|"HTTP"| PMA
     PMA --> DB
+    OPS -->|"SSH"| SSH
 
-    classDef bad fill:#f8d7da,stroke:#a3262a,color:#58151c;
-    classDef db fill:#fde2cf,stroke:#9a3412,color:#7c2d12;
-    class APA,UPL,PMA,BK,SSH bad;
+    classDef app fill:#eef2ff,stroke:#3730a3,color:#1e1b4b;
+    classDef db fill:#fff7ed,stroke:#9a3412,color:#7c2d12;
+    classDef ext fill:#f1f5f9,stroke:#475569,color:#1e293b;
+    class APA,WP,MEDIA,PMA,SSH app;
     class DB db;
+    class PAY,MAIL ext;
 ```
 
-> Los nodos en rojo son los puntos débiles de esta arquitectura. **Quién los ataca y cómo** se
-> documenta aparte, en el modelo de amenazas STRIDE/DREAD, no en el diagrama.
+**Debilidades de esta arquitectura (as-is):** tráfico en **HTTP sin cifrar**, un **solo servidor sin
+segmentación** (aplicación y base de datos juntas), **sin WAF ni firewall**, herramientas de
+administración (**phpMyAdmin y SSH**) accesibles desde internet, plugins de terceros **sin
+actualizar** y base de datos **sin cifrado en reposo**. Estas debilidades se detallan en la tabla de
+las 7 capas y se tratan en el modelo de amenazas STRIDE/DREAD.
 
 ### Flujo de datos (producción)
 

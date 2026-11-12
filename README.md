@@ -23,31 +23,39 @@ en la nube que expone todo a internet.
 flowchart TB
     WEB["Cliente web"]
     MOV["Cliente movil"]
-    DNS["DNS · tiendamodagt.com"]
+    OPS["Administrador / gerente"]
+    DNS["DNS y dominio<br/>tiendamodagt.com"]
 
-    subgraph CLOUD["Proveedor Cloud — 1 servidor, sin firewall"]
+    subgraph HOST["Servidor Cloud unico — VPS Linux"]
         direction TB
-        APA["Apache 2.4 + PHP 7.4<br/>WordPress + WooCommerce<br/>plugins con CVE"]
-        PMA["phpMyAdmin expuesto"]
-        BK["respaldo_tienda.sql publico"]
-        DB[("MySQL en el mismo servidor<br/>clientes · pedidos · pagos<br/>sin cifrado")]
+        APA["Apache 2.4 + PHP 7.4<br/>WordPress + WooCommerce"]
+        DB[("MySQL<br/>productos · clientes · pedidos")]
+        PMA["phpMyAdmin / SSH<br/>(administracion)"]
     end
 
-    WEB -->|"HTTP sin TLS"| DNS
-    MOV -->|"HTTP sin TLS"| DNS
+    PAY["Stripe (pagos)"]
+    MAIL["SMTP (correos)"]
+
+    WEB -->|"HTTP"| DNS
+    MOV -->|"HTTP"| DNS
     DNS --> APA
     APA --> DB
-    PMA --> DB
+    APA --> PAY
+    APA --> MAIL
+    OPS --> PMA --> DB
 
-    classDef bad fill:#f8d7da,stroke:#a3262a,color:#58151c;
-    classDef db fill:#fde2cf,stroke:#9a3412,color:#7c2d12;
-    class APA,PMA,BK bad;
+    classDef app fill:#eef2ff,stroke:#3730a3,color:#1e1b4b;
+    classDef db fill:#fff7ed,stroke:#9a3412,color:#7c2d12;
+    classDef ext fill:#f1f5f9,stroke:#475569,color:#1e293b;
+    class APA,PMA app;
     class DB db;
+    class PAY,MAIL ext;
 ```
 
-> El laboratorio **emula esta misma arquitectura** con Docker en tu equipo (`127.0.0.1`) para poder
-> atacarla sin riesgo. El diagrama detallado, el del **rediseño seguro** (con API Gateway, WAF, IAM,
-> cifrado KMS y red privada) y el mapeo producción ↔ laboratorio están en
+> Despliegue **as-is** (vulnerable): HTTP sin cifrar, un solo servidor sin segmentación, sin WAF y con
+> la administración expuesta. El laboratorio **emula esta misma arquitectura** con Docker en tu equipo
+> (`127.0.0.1`) para atacarla sin riesgo. El diagrama detallado, el del **rediseño seguro** (API
+> Gateway, WAF, IAM, cifrado KMS, red privada) y el mapeo producción ↔ laboratorio están en
 > **[ARQUITECTURA.md](ARQUITECTURA.md)**.
 
 ---
