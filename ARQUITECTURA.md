@@ -52,18 +52,18 @@ flowchart TB
         direction TB
         subgraph DOCKER["Docker Engine — red interna 'app'"]
             direction TB
-            WPC["<b>Contenedor web</b><br/>imagen: wordpress:php7.4-apache<br/>Apache 2.4 · PHP 7.4<br/>WordPress 6.1 + WooCommerce 7.9<br/>6 plugins de terceros (con CVE)<br/>puerto 80 → 8080"]
-            DB[("<b>Contenedor base de datos</b><br/>imagen: mariadb:10.6<br/>BD 'tienda' · puerto 3306<br/>productos · clientes · pedidos<br/>sin cifrado en reposo")]
-            PMA["<b>Contenedor phpMyAdmin</b><br/>imagen: phpmyadmin:latest<br/>gestor de la BD · puerto 8081"]
-            MEDIA["<b>Volumen de archivos</b><br/>wp-content/uploads<br/>imagenes y comprobantes de pago"]
+            WPC["Contenedor web<br/>imagen: wordpress:php7.4-apache<br/>Apache 2.4 · PHP 7.4<br/>WordPress 6.1 + WooCommerce 7.9<br/>6 plugins de terceros (con CVE)<br/>puerto 80 → 8080"]
+            DB[("Contenedor base de datos<br/>imagen: mariadb:10.6<br/>BD 'tienda' · puerto 3306<br/>productos · clientes · pedidos<br/>sin cifrado en reposo")]
+            PMA["Contenedor phpMyAdmin<br/>imagen: phpmyadmin:latest<br/>gestor de la BD · puerto 8081"]
+            MEDIA["Volumen de archivos<br/>wp-content/uploads<br/>imagenes y comprobantes de pago"]
         end
-        SSH["<b>Acceso SSH</b><br/>sshd · puerto 22<br/>administracion del servidor"]
+        SSH["Acceso SSH<br/>sshd · puerto 22<br/>administracion del servidor"]
     end
 
     subgraph EXT["Servicios externos"]
         direction LR
-        PAY["<b>Stripe</b><br/>API de pagos<br/>HTTPS"]
-        MAIL["<b>SMTP</b><br/>correos de pedidos<br/>puerto 587"]
+        PAY["Stripe<br/>API de pagos<br/>HTTPS"]
+        MAIL["SMTP<br/>correos de pedidos<br/>puerto 587"]
     end
 
     WEB -->|"HTTP 80"| DNS
