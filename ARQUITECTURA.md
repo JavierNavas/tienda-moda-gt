@@ -51,16 +51,10 @@ flowchart TB
     subgraph HOST["Servidor Cloud - un solo equipo (VPS Linux), sin firewall"]
         direction TB
         subgraph DOCKER["Docker - 3 contenedores SEPARADOS en la misma red interna"]
-            direction LR
-            subgraph C1["CONTENEDOR 1: Web"]
-                WPC["wordpress:php7.4-apache<br/>Apache 2.4 + PHP 7.4<br/>WordPress 6.1 + WooCommerce 7.9<br/>6 plugins con CVE"]
-            end
-            subgraph C2["CONTENEDOR 2: Base de datos"]
-                DB[("mariadb:10.6<br/>BD tienda<br/>productos, clientes, pedidos<br/>sin cifrado")]
-            end
-            subgraph C3["CONTENEDOR 3: Administracion"]
-                PMA["phpmyadmin:latest<br/>gestor de la BD"]
-            end
+            direction TB
+            WPC["CONTENEDOR 1 - Web<br/>wordpress:php7.4-apache<br/>Apache 2.4 + PHP 7.4<br/>WordPress 6.1 + WooCommerce 7.9<br/>6 plugins con CVE"]
+            DB[("CONTENEDOR 2 - Base de datos<br/>mariadb:10.6<br/>BD tienda, sin cifrado<br/>productos, clientes, pedidos")]
+            PMA["CONTENEDOR 3 - Administracion<br/>phpmyadmin:latest<br/>gestor de la BD"]
         end
         MEDIA["Volumen Docker<br/>wp-content/uploads<br/>imagenes y comprobantes"]
         SSH["Acceso SSH al servidor<br/>sshd, puerto 22"]

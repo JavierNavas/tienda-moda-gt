@@ -29,16 +29,10 @@ flowchart TB
     subgraph HOST["Servidor Cloud - un solo equipo (VPS Linux)"]
         direction TB
         subgraph DOCKER["Docker - 3 contenedores separados"]
-            direction LR
-            subgraph C1["Contenedor 1: Web"]
-                WPC["Apache + PHP<br/>WordPress + WooCommerce"]
-            end
-            subgraph C2["Contenedor 2: BD"]
-                DB[("MySQL / MariaDB")]
-            end
-            subgraph C3["Contenedor 3"]
-                PMA["phpMyAdmin"]
-            end
+            direction TB
+            WPC["CONTENEDOR 1 - Web<br/>Apache + PHP<br/>WordPress + WooCommerce"]
+            DB[("CONTENEDOR 2 - Base de datos<br/>MySQL / MariaDB")]
+            PMA["CONTENEDOR 3 - phpMyAdmin"]
         end
         SSH["Acceso SSH"]
     end
