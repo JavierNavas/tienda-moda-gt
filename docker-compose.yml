@@ -1,0 +1,67 @@
+# Laboratorio Opción B: tienda WordPress + WooCommerce vulnerable.
+# Todo queda publicado solo en 127.0.0.1 (no se expone a la red ni a internet).
+services:
+  db:
+    image: mariadb:10.6
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: root123
+      MARIADB_DATABASE: tienda
+      MARIADB_USER: tienda
+      MARIADB_PASSWORD: tienda123
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - db:/var/lib/mysql
+
+  wordpress:
+    build: .
+    image: tienda-vulnerable:1.0
+    restart: unless-stopped
+    depends_on:
+      - db
+    ports:
+      - "127.0.0.1:8080:80"
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_NAME: tienda
+      WORDPRESS_DB_USER: tienda
+      WORDPRESS_DB_PASSWORD: tienda123
+      WORDPRESS_DEBUG: "1"
+      WORDPRESS_CONFIG_EXTRA: |
+        define('WP_DEBUG_LOG', true);
+        define('WP_DEBUG_DISPLAY', true);
+        define('AUTOMATIC_UPDATER_DISABLED', true);
+    volumes:
+      - wp:/var/www/html
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    restart: unless-stopped
+    depends_on:
+      - db
+    ports:
+      - "127.0.0.1:8081:80"
+    environment:
+      PMA_HOST: db
+
+  wpcli:
+    image: wordpress:cli-php7.4
+    profiles: ["herramientas"]
+    user: "33:33"
+    depends_on:
+      - db
+      - wordpress
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_NAME: tienda
+      WORDPRESS_DB_USER: tienda
+      WORDPRESS_DB_PASSWORD: tienda123
+      HOME: /tmp
+    volumes:
+      - wp:/var/www/html
+      - ./setup:/setup:ro
+
+volumes:
+  db: {}
+  wp: {}
