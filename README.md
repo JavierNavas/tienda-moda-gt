@@ -12,43 +12,47 @@ Todo corre dentro de Docker, en la computadora de cada quien (`127.0.0.1`).
 
 ---
 
-## Arquitectura actual (hoy, vulnerable)
+## Arquitectura actual en producción (vulnerable)
 
 Un **CMS** es un gestor de contenidos para crear sitios web sin programarlos desde cero. Aquí se usa
 **WordPress** (el CMS más común) con **WooCommerce**, el complemento que lo vuelve tienda en línea.
-El laboratorio levanta tres contenedores Docker que se comunican en una red local.
+Así estaría desplegada la tienda **en un entorno real** antes de aplicar seguridad: un solo servidor
+en la nube que expone todo a internet.
 
 ```mermaid
-flowchart LR
-    U["Cliente / Atacante<br/>(navegador)"]
-    A["Administrador"]
+flowchart TB
+    WEB["Cliente web"]
+    MOV["Cliente movil"]
+    ATK["Atacante"]
+    DNS["DNS · tiendamodagt.com"]
 
-    subgraph HOST["Equipo local — Docker (127.0.0.1)"]
+    subgraph CLOUD["Proveedor Cloud — 1 servidor, sin firewall"]
         direction TB
-        subgraph WPC["Contenedor: wordpress (puerto 8080)"]
-            WP["Apache 2.4 + PHP 7.4<br/>WordPress 6.1 + WooCommerce 7.9<br/>6 plugins con CVE conocidos"]
-            EXP["Archivos expuestos a proposito:<br/>info.php · adminer.php · respaldo_tienda.sql"]
-        end
-        PMA["Contenedor: phpMyAdmin<br/>(puerto 8081)"]
-        DB[("Contenedor: MariaDB 10.6<br/>base de datos 'tienda'<br/>clientes · pedidos · pagos")]
+        APA["Apache 2.4 + PHP 7.4<br/>WordPress + WooCommerce<br/>plugins con CVE"]
+        PMA["phpMyAdmin expuesto"]
+        BK["respaldo_tienda.sql publico"]
+        DB[("MySQL en el mismo servidor<br/>clientes · pedidos · pagos<br/>sin cifrado")]
     end
 
-    U -->|"HTTP 8080"| WP
-    A -->|"HTTP 8081"| PMA
-    WP -->|"SQL 3306"| DB
-    PMA -->|"SQL 3306"| DB
-    EXP -.->|"fuga de informacion"| DB
+    WEB -->|"HTTP sin TLS"| DNS
+    MOV -->|"HTTP sin TLS"| DNS
+    DNS --> APA
+    APA --> DB
+    PMA --> DB
+    ATK -.->|"accede directo"| PMA
+    ATK -.->|"descarga"| BK
+    ATK -.->|"explota CVE"| APA
 
-    classDef vuln fill:#f8d7da,stroke:#a3262a,color:#58151c;
-    classDef db fill:#d1e7dd,stroke:#0f5132,color:#0a3622;
-    class WP,EXP vuln;
+    classDef bad fill:#f8d7da,stroke:#a3262a,color:#58151c;
+    classDef db fill:#fde2cf,stroke:#9a3412,color:#7c2d12;
+    class APA,PMA,BK bad;
     class DB db;
 ```
 
-**Qué la hace insegura:** plugins desactualizados con CVE, versiones de software visibles, errores de
-PHP expuestos, gestor de base de datos y respaldo accesibles desde la web, sin WAF ni cifrado TLS.
-El rediseño seguro se propone en la Fase 4 del informe. El detalle está en
-[ARQUITECTURA.md](ARQUITECTURA.md).
+> El laboratorio **emula esta misma arquitectura** con Docker en tu equipo (`127.0.0.1`) para poder
+> atacarla sin riesgo. El diagrama detallado, el del **rediseño seguro** (con API Gateway, WAF, IAM,
+> cifrado KMS y red privada) y el mapeo producción ↔ laboratorio están en
+> **[ARQUITECTURA.md](ARQUITECTURA.md)**.
 
 ---
 

@@ -30,45 +30,79 @@ principal punto débil. Eso permite demostrar el OWASP Web Top 10 con vulnerabil
 
 ---
 
-## 2. Cómo está construida hoy (versión vulnerable)
+## 2. Arquitectura actual en producción (as-is, vulnerable)
 
-El laboratorio levanta **tres contenedores** Docker que se comunican entre sí en una red local. Todo
-queda publicado solo en `127.0.0.1`, nunca en internet.
+Así estaría desplegada la tienda **en un entorno real de producción** antes de aplicar seguridad. Es
+el despliegue típico y económico de una tienda WooCommerce pequeña: un solo servidor en la nube que
+expone todo a internet sin controles. Este es el diagrama **actual** que pide el entregable de la
+Fase 1.
 
 ```mermaid
-flowchart LR
-    U["Cliente / Atacante<br/>(navegador)"]
-    A["Administrador"]
-
-    subgraph HOST["Equipo local — Docker (127.0.0.1)"]
-        direction TB
-        subgraph WPC["Contenedor: wordpress (puerto 8080)"]
-            WP["Apache 2.4 + PHP 7.4<br/>WordPress 6.1 + WooCommerce 7.9<br/>6 plugins con CVE conocidos"]
-            EXP["Archivos expuestos a proposito:<br/>info.php · adminer.php · respaldo_tienda.sql"]
-        end
-        PMA["Contenedor: phpMyAdmin<br/>(puerto 8081)"]
-        DB[("Contenedor: MariaDB 10.6<br/>base de datos 'tienda'<br/>clientes · pedidos · pagos")]
+flowchart TB
+    subgraph CLIENTES["Clientes"]
+        direction LR
+        WEB["Navegador web"]
+        MOV["Navegador / app movil"]
     end
 
-    U -->|"HTTP 8080"| WP
-    A -->|"HTTP 8081"| PMA
-    WP -->|"SQL 3306"| DB
-    PMA -->|"SQL 3306"| DB
-    EXP -.->|"fuga de informacion"| DB
+    ATK["Atacante<br/>(internet)"]
 
-    classDef vuln fill:#f8d7da,stroke:#a3262a,color:#58151c;
-    classDef db fill:#d1e7dd,stroke:#0f5132,color:#0a3622;
-    class WP,EXP vuln;
+    subgraph INET["Internet publico"]
+        DNS["DNS<br/>tiendamodagt.com"]
+    end
+
+    subgraph CLOUD["Proveedor Cloud — 1 sola instancia (VM Linux), sin firewall"]
+        direction TB
+        APA["Servidor web Apache 2.4 + PHP 7.4<br/>WordPress 6.1 + WooCommerce 7.9<br/>6 plugins desactualizados con CVE"]
+        UPL["Carpeta de subidas<br/>(comprobantes de pago)<br/>permite ejecutar archivos"]
+        PMA["phpMyAdmin<br/>publicado en internet"]
+        BK["respaldo_tienda.sql<br/>en carpeta web publica"]
+        SSH["Puerto 22 (SSH)<br/>abierto a 0.0.0.0/0"]
+        DB[("MySQL en el MISMO servidor<br/>clientes · pedidos · pagos<br/>sin cifrado en reposo")]
+    end
+
+    PAY["Pasarela de pago<br/>Stripe (API externa)"]
+
+    WEB -->|"HTTP sin TLS"| DNS
+    MOV -->|"HTTP sin TLS"| DNS
+    DNS --> APA
+    APA --> DB
+    APA --> UPL
+    APA -->|"claves en texto"| PAY
+    PMA --> DB
+    ATK -.->|"accede directo"| PMA
+    ATK -.->|"descarga"| BK
+    ATK -.->|"fuerza bruta"| SSH
+    ATK -.->|"explota CVE"| APA
+
+    classDef bad fill:#f8d7da,stroke:#a3262a,color:#58151c;
+    classDef db fill:#fde2cf,stroke:#9a3412,color:#7c2d12;
+    classDef atk fill:#e9d5ff,stroke:#6b21a8,color:#3b0764;
+    class APA,UPL,PMA,BK,SSH bad;
     class DB db;
+    class ATK atk;
 ```
 
-### Flujo de datos
+### Flujo de datos (producción)
 
-1. El cliente abre la tienda en el navegador por el **puerto 8080**.
-2. Apache ejecuta el código PHP de WordPress y WooCommerce.
-3. WordPress consulta la base de datos **MariaDB** por el puerto 3306 para leer productos, usuarios
-   y pedidos.
-4. El administrador gestiona la base de datos por **phpMyAdmin** en el puerto 8081.
+1. El cliente (web o móvil) entra por el dominio **sin cifrado (HTTP)**, cualquiera en la red puede
+   leer el tráfico.
+2. El servidor Apache ejecuta WordPress y WooCommerce, con plugins que tienen CVE conocidos.
+3. La base de datos MySQL vive en **el mismo servidor**, sin cifrado ni aislamiento.
+4. El administrador y cualquier atacante llegan a **phpMyAdmin** y al **respaldo** directamente desde
+   internet. El puerto **SSH** queda abierto a todo el mundo.
+
+### Entorno de laboratorio (cómo se emula esta arquitectura)
+
+No se despliega en la nube real. Se **emula la misma topología** con tres contenedores Docker en
+`127.0.0.1`, para poder atacarla sin riesgo. El mapeo es directo:
+
+| En producción (diagrama de arriba) | En el laboratorio (Docker) |
+|---|---|
+| Servidor web Apache + PHP | Contenedor `wordpress` → `http://127.0.0.1:8080` |
+| MySQL en el servidor | Contenedor `db` (MariaDB 10.6) |
+| phpMyAdmin expuesto | Contenedor `phpmyadmin` → `http://127.0.0.1:8081` |
+| Respaldo y archivos expuestos | `respaldo_tienda.sql`, `info.php`, `adminer.php` |
 
 ### Por qué esta arquitectura es insegura
 
@@ -92,30 +126,61 @@ Esta es la arquitectura objetivo. Cumple lo que pide la rúbrica: flujo del clie
 datos con **API Gateway**, **servicio de identidad (IAM)**, **WAF** y **almacenamiento cifrado**.
 
 ```mermaid
-flowchart LR
-    U["Cliente<br/>(web / movil)"]
+flowchart TB
+    subgraph CLIENTES["Clientes"]
+        direction LR
+        WEB["Navegador web"]
+        MOV["App / navegador movil"]
+    end
+
+    subgraph EDGE["Borde (internet)"]
+        direction TB
+        CDN["CDN (Cloudflare / CloudFront)<br/>cache + anti-DDoS"]
+        WAF["WAF<br/>reglas OWASP Top 10<br/>(SQLi, XSS, bots)"]
+    end
 
     subgraph CLOUD["Nube (AWS o equivalente)"]
         direction TB
-        WAF["CDN + WAF<br/>(Cloudflare / AWS WAF)<br/>bloquea OWASP Top 10"]
-        GW["API Gateway<br/>TLS 1.3 en transito"]
-        IAM["Servicio de identidad<br/>(IAM / Cognito / Auth0)<br/>menor privilegio + MFA"]
+        GW["API Gateway<br/>TLS 1.3 en transito<br/>rate limiting"]
+        IAM["Identidad: IAM / Cognito / Auth0<br/>MFA + menor privilegio<br/>roles: admin, gerente, cliente"]
+        SEC["Secrets Manager / KMS<br/>claves y llaves de cifrado"]
 
-        subgraph VPC["Red privada (VPC) — subredes aisladas"]
+        subgraph VPC["Red privada (VPC)"]
             direction TB
-            APP["WordPress + WooCommerce<br/>actualizado y endurecido"]
-            DB[("Base de datos administrada<br/>cifrada AES-256 con KMS")]
+            subgraph PUB["Subred publica"]
+                LB["Balanceador de carga"]
+            end
+            subgraph SAPP["Subred privada — aplicacion"]
+                APP["WordPress + WooCommerce<br/>actualizado y endurecido<br/>solo HTTPS, sin phpMyAdmin"]
+            end
+            subgraph SDATA["Subred privada — datos"]
+                DB[("Base de datos administrada (RDS)<br/>cifrada AES-256 con KMS<br/>sin acceso desde internet")]
+                BK["Respaldos cifrados<br/>bucket privado"]
+            end
         end
+
+        SIEM["SIEM + Monitoreo<br/>(CloudWatch / Wazuh)<br/>logs y alertas"]
     end
 
-    U -->|"HTTPS"| WAF --> GW
+    PAY["Pasarela de pago<br/>Stripe (API externa)"]
+
+    WEB -->|"HTTPS"| CDN
+    MOV -->|"HTTPS"| CDN
+    CDN --> WAF --> GW
     GW -->|"valida token"| IAM
-    GW --> APP
+    GW --> LB --> APP
     APP -->|"TLS"| DB
+    APP -->|"token seguro"| PAY
+    APP -->|"lee claves"| SEC
+    DB --> BK
+    APP -.->|"envia logs"| SIEM
+    GW -.->|"envia logs"| SIEM
     IAM -.->|"autoriza"| GW
 
     classDef sec fill:#d1e7dd,stroke:#0f5132,color:#0a3622;
-    class WAF,GW,IAM,DB sec;
+    classDef edge fill:#cfe2ff,stroke:#084298,color:#052c65;
+    class GW,IAM,SEC,APP,DB,BK,LB,SIEM sec;
+    class CDN,WAF edge;
 ```
 
 | Control que se agrega | Qué resuelve de la versión vulnerable |
