@@ -48,34 +48,39 @@ flowchart TB
 
     DNS["DNS y dominio<br/>tiendamodagt.com"]
 
-    subgraph HOST["Servidor Cloud unico - VPS Linux Ubuntu 22.04, sin firewall"]
+    subgraph HOST["Servidor Cloud - un solo equipo (VPS Linux), sin firewall"]
         direction TB
-        subgraph DOCKER["Docker Engine - red interna app"]
-            direction TB
-            WPC["Contenedor web<br/>imagen wordpress:php7.4-apache<br/>Apache 2.4, PHP 7.4<br/>WordPress 6.1 + WooCommerce 7.9<br/>6 plugins de terceros con CVE<br/>puerto 80 a 8080"]
-            DB[("Contenedor base de datos<br/>imagen mariadb:10.6<br/>BD tienda, puerto 3306<br/>productos, clientes, pedidos<br/>sin cifrado en reposo")]
-            PMA["Contenedor phpMyAdmin<br/>imagen phpmyadmin:latest<br/>gestor de la BD, puerto 8081"]
-            MEDIA["Volumen de archivos<br/>wp-content/uploads<br/>imagenes y comprobantes de pago"]
+        subgraph DOCKER["Docker - 3 contenedores SEPARADOS en la misma red interna"]
+            direction LR
+            subgraph C1["CONTENEDOR 1: Web"]
+                WPC["wordpress:php7.4-apache<br/>Apache 2.4 + PHP 7.4<br/>WordPress 6.1 + WooCommerce 7.9<br/>6 plugins con CVE"]
+            end
+            subgraph C2["CONTENEDOR 2: Base de datos"]
+                DB[("mariadb:10.6<br/>BD tienda<br/>productos, clientes, pedidos<br/>sin cifrado")]
+            end
+            subgraph C3["CONTENEDOR 3: Administracion"]
+                PMA["phpmyadmin:latest<br/>gestor de la BD"]
+            end
         end
-        SSH["Acceso SSH<br/>sshd, puerto 22<br/>administracion del servidor"]
+        MEDIA["Volumen Docker<br/>wp-content/uploads<br/>imagenes y comprobantes"]
+        SSH["Acceso SSH al servidor<br/>sshd, puerto 22"]
     end
 
     subgraph EXT["Servicios externos"]
         direction LR
-        PAY["Stripe<br/>API de pagos<br/>HTTPS"]
-        MAIL["SMTP<br/>correos de pedidos<br/>puerto 587"]
+        PAY["NeoNet (VisaNet Guatemala)<br/>pasarela de pago con tarjeta"]
+        MAIL["SMTP<br/>correos de pedidos"]
     end
 
-    WEB -.->|"DNS UDP 53"| DNS
-    MOV -.->|"DNS UDP 53"| DNS
     WEB -->|"HTTP/TCP 80 sin TLS"| WPC
     MOV -->|"HTTP/TCP 80 sin TLS"| WPC
-    WPC -->|"MySQL/TCP 3306"| DB
+    WEB -.->|"DNS UDP 53"| DNS
+    WPC -->|"red interna Docker, MySQL/TCP 3306"| DB
+    PMA -->|"MySQL/TCP 3306"| DB
     WPC -->|"lectura y escritura"| MEDIA
     WPC -->|"HTTPS/TCP 443"| PAY
     WPC -->|"SMTP/TCP 587"| MAIL
     OPS -->|"HTTP/TCP 8081"| PMA
-    PMA -->|"MySQL/TCP 3306"| DB
     OPS -->|"SSH/TCP 22"| SSH
 
     classDef app fill:#eef2ff,stroke:#3730a3,color:#1e1b4b;
@@ -86,6 +91,10 @@ flowchart TB
     class PAY,MAIL ext;
 ```
 
+> **Son tres contenedores independientes**, cada uno su propia caja. WordPress y la base de datos
+> **no** están juntos: se comunican por la red interna de Docker (puerto 3306). La debilidad no es que
+> estén juntos, sino que los tres corren en **el mismo servidor sin segmentación**.
+
 ### Protocolos y puertos de comunicación
 
 Cómo se comunica cada parte en producción, de origen a destino:
@@ -95,7 +104,7 @@ Cómo se comunica cada parte en producción, de origen a destino:
 | 1 | Cliente (web / móvil) | DNS | DNS, UDP 53 | — |
 | 2 | Cliente (web / móvil) | Contenedor web | HTTP, TCP 80 | **No (sin TLS)** |
 | 3 | Contenedor web | Base de datos | MySQL, TCP 3306 | No |
-| 4 | Contenedor web | Stripe (pagos) | HTTPS, TCP 443 | Sí |
+| 4 | Contenedor web | NeoNet (VisaNet GT) | HTTPS, TCP 443 | Sí |
 | 5 | Contenedor web | Servidor de correo | SMTP, TCP 587 | Según configuración |
 | 6 | Administrador | phpMyAdmin | HTTP, TCP 8081 | **No (sin TLS)** |
 | 7 | phpMyAdmin | Base de datos | MySQL, TCP 3306 | No |
@@ -114,7 +123,7 @@ Cómo se comunica cada parte en producción, de origen a destino:
 | phpMyAdmin | `phpmyadmin:latest` | 8081 | Administrar la base de datos | Accesible desde internet |
 | Volumen uploads | `wp-content/uploads` | — | Imágenes y comprobantes subidos | Permite ejecutar archivos subidos |
 | Acceso SSH | `sshd` | 22 | Entrar al servidor | Abierto a 0.0.0.0/0 |
-| Stripe | API externa | 443 | Procesar pagos | Claves en texto plano |
+| NeoNet (VisaNet GT) | API externa | 443 | Procesar pagos con tarjeta | Claves en configuracion |
 | SMTP | Servidor de correo | 587 | Enviar correos de pedidos | — |
 
 > **Sobre la base de datos (decisión de diseño).** En el mundo real se usan las dos formas. Las
@@ -124,6 +133,13 @@ Cómo se comunica cada parte en producción, de origen a destino:
 > maduros usan un **servicio administrado** (AWS RDS, Google Cloud SQL, Azure Database), que separa la
 > base de datos, la cifra, la respalda y la mantiene aislada de internet. Por eso el **rediseño
 > seguro** (sección 3) mueve la base de datos a un servicio administrado y cifrado con KMS.
+
+> **Sobre la pasarela de pago.** En Guatemala **Stripe no opera**, así que una tienda real usa una
+> pasarela local: **NeoNet (antes VisaNet Guatemala)** o Recurrente para tarjeta, más transferencia
+> bancaria y pago contra entrega. Por eso el diagrama de producción muestra NeoNet. En el laboratorio
+> se mantiene instalado el plugin de Stripe por una razón distinta: tiene un **CVE público
+> (CVE-2023-34000)** que sirve para demostrar una vulnerabilidad de IDOR en la Fase 3. Es un
+> componente de prueba, no la pasarela del escenario de producción.
 
 **Sobre los contenedores:** en producción los tres contenedores (web, base de datos y phpMyAdmin)
 corren sobre un mismo servidor con Docker. **En el laboratorio son exactamente los mismos**, pero en
@@ -215,7 +231,7 @@ flowchart TB
         SIEM["SIEM + Monitoreo<br/>(CloudWatch / Wazuh)<br/>logs y alertas"]
     end
 
-    PAY["Pasarela de pago<br/>Stripe (API externa)"]
+    PAY["Pasarela de pago<br/>NeoNet (VisaNet Guatemala)"]
 
     WEB -->|"HTTPS"| CDN
     MOV -->|"HTTPS"| CDN
@@ -267,7 +283,7 @@ flowchart TB
 | Datos de clientes (nombre, dirección, correo) | Información | Base de datos | Alta | Alta | Media |
 | Pedidos y su historial | Información | Base de datos | Alta | Alta | Media |
 | Credenciales de usuarios | Información | Base de datos | Alta | Alta | Alta |
-| Configuración de pagos (Stripe) | Información | Base de datos | Alta | Alta | Media |
+| Configuración de pagos (pasarela) | Información | Base de datos | Alta | Alta | Media |
 | Código de WordPress y plugins | Software | Contenedor wordpress | Media | Alta | Alta |
 | Base de datos MariaDB | Software | Contenedor db | Alta | Alta | Alta |
 | Servidor Apache / PHP | Servicios | Contenedor wordpress | Media | Media | Alta |

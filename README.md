@@ -26,18 +26,24 @@ flowchart TB
     OPS["Administrador / gerente"]
     DNS["DNS y dominio<br/>tiendamodagt.com"]
 
-    subgraph HOST["Servidor Cloud unico - VPS Linux"]
+    subgraph HOST["Servidor Cloud - un solo equipo (VPS Linux)"]
         direction TB
-        subgraph DOCKER["Docker (contenedores)"]
-            direction TB
-            WPC["Web: Apache + PHP<br/>WordPress + WooCommerce"]
-            DB[("Base de datos<br/>MySQL / MariaDB")]
-            PMA["phpMyAdmin"]
+        subgraph DOCKER["Docker - 3 contenedores separados"]
+            direction LR
+            subgraph C1["Contenedor 1: Web"]
+                WPC["Apache + PHP<br/>WordPress + WooCommerce"]
+            end
+            subgraph C2["Contenedor 2: BD"]
+                DB[("MySQL / MariaDB")]
+            end
+            subgraph C3["Contenedor 3"]
+                PMA["phpMyAdmin"]
+            end
         end
         SSH["Acceso SSH"]
     end
 
-    PAY["Stripe (pagos)"]
+    PAY["NeoNet (VisaNet GT)<br/>pagos con tarjeta"]
     MAIL["SMTP (correos)"]
 
     WEB -->|"HTTP/TCP 80 sin TLS"| WPC
