@@ -48,34 +48,34 @@ flowchart TB
 
     DNS["DNS y dominio<br/>tiendamodagt.com"]
 
-    subgraph HOST["Servidor Cloud unico — VPS Linux (Ubuntu), sin firewall"]
+    subgraph HOST["Servidor Cloud unico — VPS Linux (Ubuntu 22.04), sin firewall"]
         direction TB
-        subgraph DOCKER["Docker Engine (contenedores)"]
+        subgraph DOCKER["Docker Engine — red interna 'app'"]
             direction TB
-            WPC["Contenedor web<br/>Apache 2.4 + PHP 7.4<br/>WordPress + WooCommerce + plugins"]
-            DB[("Contenedor base de datos<br/>MySQL / MariaDB<br/>productos · clientes · pedidos")]
-            PMA["Contenedor phpMyAdmin<br/>(administracion)"]
-            MEDIA["Volumen de archivos<br/>uploads (imagenes, comprobantes)"]
+            WPC["<b>Contenedor web</b><br/>imagen: wordpress:php7.4-apache<br/>Apache 2.4 · PHP 7.4<br/>WordPress 6.1 + WooCommerce 7.9<br/>6 plugins de terceros (con CVE)<br/>puerto 80 → 8080"]
+            DB[("<b>Contenedor base de datos</b><br/>imagen: mariadb:10.6<br/>BD 'tienda' · puerto 3306<br/>productos · clientes · pedidos<br/>sin cifrado en reposo")]
+            PMA["<b>Contenedor phpMyAdmin</b><br/>imagen: phpmyadmin:latest<br/>gestor de la BD · puerto 8081"]
+            MEDIA["<b>Volumen de archivos</b><br/>wp-content/uploads<br/>imagenes y comprobantes de pago"]
         end
-        SSH["Acceso SSH al servidor"]
+        SSH["<b>Acceso SSH</b><br/>sshd · puerto 22<br/>administracion del servidor"]
     end
 
     subgraph EXT["Servicios externos"]
         direction LR
-        PAY["Stripe<br/>(pagos)"]
-        MAIL["SMTP<br/>(correos de pedidos)"]
+        PAY["<b>Stripe</b><br/>API de pagos<br/>HTTPS"]
+        MAIL["<b>SMTP</b><br/>correos de pedidos<br/>puerto 587"]
     end
 
-    WEB -->|"HTTP"| DNS
-    MOV -->|"HTTP"| DNS
+    WEB -->|"HTTP 80"| DNS
+    MOV -->|"HTTP 80"| DNS
     DNS --> WPC
-    WPC --> DB
+    WPC -->|"SQL 3306"| DB
     WPC --> MEDIA
-    WPC --> PAY
-    WPC --> MAIL
-    OPS -->|"HTTP"| PMA
-    PMA --> DB
-    OPS -->|"SSH"| SSH
+    WPC -->|"API"| PAY
+    WPC -->|"587"| MAIL
+    OPS -->|"HTTP 8081"| PMA
+    PMA -->|"SQL 3306"| DB
+    OPS -->|"SSH 22"| SSH
 
     classDef app fill:#eef2ff,stroke:#3730a3,color:#1e1b4b;
     classDef db fill:#fff7ed,stroke:#9a3412,color:#7c2d12;
@@ -84,6 +84,26 @@ flowchart TB
     class DB db;
     class PAY,MAIL ext;
 ```
+
+### Detalle de cada componente
+
+| Componente | Tecnología / imagen | Puerto | Función | Estado de seguridad |
+|---|---|---|---|---|
+| Contenedor web | `wordpress:php7.4-apache` | 80 → 8080 | Sirve la tienda (WordPress + WooCommerce) | Plugins con CVE, errores PHP visibles |
+| Base de datos | `mariadb:10.6` | 3306 | Guarda productos, clientes y pedidos | Sin cifrado en reposo |
+| phpMyAdmin | `phpmyadmin:latest` | 8081 | Administrar la base de datos | Accesible desde internet |
+| Volumen uploads | `wp-content/uploads` | — | Imágenes y comprobantes subidos | Permite ejecutar archivos subidos |
+| Acceso SSH | `sshd` | 22 | Entrar al servidor | Abierto a 0.0.0.0/0 |
+| Stripe | API externa | 443 | Procesar pagos | Claves en texto plano |
+| SMTP | Servidor de correo | 587 | Enviar correos de pedidos | — |
+
+> **Sobre la base de datos (decisión de diseño).** En el mundo real se usan las dos formas. Las
+> tiendas pequeñas o los despliegues económicos sí corren la base de datos **en un contenedor en el
+> mismo servidor**, como en este diagrama *as-is*. Es común, pero se considera mala práctica: la base
+> de datos queda en el mismo host que la web, sin respaldos administrados ni cifrado. Los despliegues
+> maduros usan un **servicio administrado** (AWS RDS, Google Cloud SQL, Azure Database), que separa la
+> base de datos, la cifra, la respalda y la mantiene aislada de internet. Por eso el **rediseño
+> seguro** (sección 3) mueve la base de datos a un servicio administrado y cifrado con KMS.
 
 **Sobre los contenedores:** en producción los tres contenedores (web, base de datos y phpMyAdmin)
 corren sobre un mismo servidor con Docker. **En el laboratorio son exactamente los mismos**, pero en
