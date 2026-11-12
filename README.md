@@ -6,10 +6,49 @@
 
 Proyecto Final del curso **Seguridad en Aplicaciones** — Maestría en Seguridad Informática, UMG.
 Escenario de la **Opción B (CMS / E-Commerce)**: una tienda en línea para analizar, atacar y asegurar.
+Todo corre dentro de Docker, en la computadora de cada quien (`127.0.0.1`).
 
-para el **Proyecto Final del curso Seguridad en Aplicaciones (Opción B: CMS / E-Commerce)**.
+> 📐 **Especificación técnica completa, diagrama y arquitectura:** ver [ARQUITECTURA.md](ARQUITECTURA.md)
 
-Todo corre dentro de Docker, en la computadora de cada quien (`127.0.0.1`). **Nunca se expone a internet.**
+---
+
+## Arquitectura actual (hoy, vulnerable)
+
+Un **CMS** es un gestor de contenidos para crear sitios web sin programarlos desde cero. Aquí se usa
+**WordPress** (el CMS más común) con **WooCommerce**, el complemento que lo vuelve tienda en línea.
+El laboratorio levanta tres contenedores Docker que se comunican en una red local.
+
+```mermaid
+flowchart LR
+    U["Cliente / Atacante<br/>(navegador)"]
+    A["Administrador"]
+
+    subgraph HOST["Equipo local — Docker (127.0.0.1)"]
+        direction TB
+        subgraph WPC["Contenedor: wordpress (puerto 8080)"]
+            WP["Apache 2.4 + PHP 7.4<br/>WordPress 6.1 + WooCommerce 7.9<br/>6 plugins con CVE conocidos"]
+            EXP["Archivos expuestos a proposito:<br/>info.php · adminer.php · respaldo_tienda.sql"]
+        end
+        PMA["Contenedor: phpMyAdmin<br/>(puerto 8081)"]
+        DB[("Contenedor: MariaDB 10.6<br/>base de datos 'tienda'<br/>clientes · pedidos · pagos")]
+    end
+
+    U -->|"HTTP 8080"| WP
+    A -->|"HTTP 8081"| PMA
+    WP -->|"SQL 3306"| DB
+    PMA -->|"SQL 3306"| DB
+    EXP -.->|"fuga de informacion"| DB
+
+    classDef vuln fill:#f8d7da,stroke:#a3262a,color:#58151c;
+    classDef db fill:#d1e7dd,stroke:#0f5132,color:#0a3622;
+    class WP,EXP vuln;
+    class DB db;
+```
+
+**Qué la hace insegura:** plugins desactualizados con CVE, versiones de software visibles, errores de
+PHP expuestos, gestor de base de datos y respaldo accesibles desde la web, sin WAF ni cifrado TLS.
+El rediseño seguro se propone en la Fase 4 del informe. El detalle está en
+[ARQUITECTURA.md](ARQUITECTURA.md).
 
 ---
 
