@@ -23,7 +23,6 @@ en la nube que expone todo a internet.
 flowchart TB
     WEB["Cliente web"]
     MOV["Cliente movil"]
-    ATK["Atacante"]
     DNS["DNS · tiendamodagt.com"]
 
     subgraph CLOUD["Proveedor Cloud — 1 servidor, sin firewall"]
@@ -39,9 +38,6 @@ flowchart TB
     DNS --> APA
     APA --> DB
     PMA --> DB
-    ATK -.->|"accede directo"| PMA
-    ATK -.->|"descarga"| BK
-    ATK -.->|"explota CVE"| APA
 
     classDef bad fill:#f8d7da,stroke:#a3262a,color:#58151c;
     classDef db fill:#fde2cf,stroke:#9a3412,color:#7c2d12;

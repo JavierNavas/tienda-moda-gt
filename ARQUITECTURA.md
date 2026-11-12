@@ -45,8 +45,6 @@ flowchart TB
         MOV["Navegador / app movil"]
     end
 
-    ATK["Atacante<br/>(internet)"]
-
     subgraph INET["Internet publico"]
         DNS["DNS<br/>tiendamodagt.com"]
     end
@@ -70,18 +68,15 @@ flowchart TB
     APA --> UPL
     APA -->|"claves en texto"| PAY
     PMA --> DB
-    ATK -.->|"accede directo"| PMA
-    ATK -.->|"descarga"| BK
-    ATK -.->|"fuerza bruta"| SSH
-    ATK -.->|"explota CVE"| APA
 
     classDef bad fill:#f8d7da,stroke:#a3262a,color:#58151c;
     classDef db fill:#fde2cf,stroke:#9a3412,color:#7c2d12;
-    classDef atk fill:#e9d5ff,stroke:#6b21a8,color:#3b0764;
     class APA,UPL,PMA,BK,SSH bad;
     class DB db;
-    class ATK atk;
 ```
+
+> Los nodos en rojo son los puntos débiles de esta arquitectura. **Quién los ataca y cómo** se
+> documenta aparte, en el modelo de amenazas STRIDE/DREAD, no en el diagrama.
 
 ### Flujo de datos (producción)
 
