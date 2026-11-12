@@ -16,8 +16,8 @@ Todo corre dentro de Docker, en la computadora de cada quien (`127.0.0.1`).
 
 Un **CMS** es un gestor de contenidos para crear sitios web sin programarlos desde cero. Aquí se usa
 **WordPress** (el CMS más común) con **WooCommerce**, el complemento que lo vuelve tienda en línea.
-Así estaría desplegada la tienda **en un entorno real** antes de aplicar seguridad: un solo servidor
-en la nube que expone todo a internet.
+Así estaría desplegada **en un entorno real**: la aplicación corre en **contenedores Docker** sobre un
+solo servidor en la nube que expone todo a internet.
 
 ```mermaid
 flowchart TB
@@ -28,9 +28,13 @@ flowchart TB
 
     subgraph HOST["Servidor Cloud unico — VPS Linux"]
         direction TB
-        APA["Apache 2.4 + PHP 7.4<br/>WordPress + WooCommerce"]
-        DB[("MySQL<br/>productos · clientes · pedidos")]
-        PMA["phpMyAdmin / SSH<br/>(administracion)"]
+        subgraph DOCKER["Docker (contenedores)"]
+            direction TB
+            WPC["Web: Apache + PHP<br/>WordPress + WooCommerce"]
+            DB[("Base de datos<br/>MySQL / MariaDB")]
+            PMA["phpMyAdmin"]
+        end
+        SSH["Acceso SSH"]
     end
 
     PAY["Stripe (pagos)"]
@@ -38,16 +42,17 @@ flowchart TB
 
     WEB -->|"HTTP"| DNS
     MOV -->|"HTTP"| DNS
-    DNS --> APA
-    APA --> DB
-    APA --> PAY
-    APA --> MAIL
+    DNS --> WPC
+    WPC --> DB
+    WPC --> PAY
+    WPC --> MAIL
     OPS --> PMA --> DB
+    OPS --> SSH
 
     classDef app fill:#eef2ff,stroke:#3730a3,color:#1e1b4b;
     classDef db fill:#fff7ed,stroke:#9a3412,color:#7c2d12;
     classDef ext fill:#f1f5f9,stroke:#475569,color:#1e293b;
-    class APA,PMA app;
+    class WPC,PMA,SSH app;
     class DB db;
     class PAY,MAIL ext;
 ```

@@ -32,10 +32,10 @@ principal punto débil. Eso permite demostrar el OWASP Web Top 10 con vulnerabil
 
 ## 2. Arquitectura actual en producción (as-is, vulnerable)
 
-Así estaría desplegada la tienda **en un entorno real de producción** antes de aplicar seguridad. Es
-el despliegue típico y económico de una tienda WooCommerce pequeña: un solo servidor en la nube que
-expone todo a internet sin controles. Este es el diagrama **actual** que pide el entregable de la
-Fase 1.
+Así estaría desplegada la tienda **en un entorno real de producción** antes de aplicar seguridad.
+Tal como pide la Opción B, la aplicación corre **en contenedores Docker**, pero sobre un solo
+servidor en la nube que expone todo a internet sin controles. Este es el diagrama **actual** que pide
+el entregable de la Fase 1.
 
 ```mermaid
 flowchart TB
@@ -48,20 +48,16 @@ flowchart TB
 
     DNS["DNS y dominio<br/>tiendamodagt.com"]
 
-    subgraph HOST["Servidor Cloud unico — VPS Linux (Ubuntu)"]
+    subgraph HOST["Servidor Cloud unico — VPS Linux (Ubuntu), sin firewall"]
         direction TB
-        subgraph APPL["Capa de aplicacion"]
-            APA["Apache 2.4 + PHP 7.4"]
-            WP["WordPress 6.1 + WooCommerce 7.9<br/>+ plugins de terceros"]
-            MEDIA["Almacenamiento de archivos<br/>uploads (imagenes, comprobantes)"]
+        subgraph DOCKER["Docker Engine (contenedores)"]
+            direction TB
+            WPC["Contenedor web<br/>Apache 2.4 + PHP 7.4<br/>WordPress + WooCommerce + plugins"]
+            DB[("Contenedor base de datos<br/>MySQL / MariaDB<br/>productos · clientes · pedidos")]
+            PMA["Contenedor phpMyAdmin<br/>(administracion)"]
+            MEDIA["Volumen de archivos<br/>uploads (imagenes, comprobantes)"]
         end
-        subgraph DATA["Capa de datos (mismo host)"]
-            DB[("MySQL 8<br/>productos · clientes · pedidos")]
-        end
-        subgraph MGMT["Administracion"]
-            PMA["phpMyAdmin"]
-            SSH["Acceso SSH"]
-        end
+        SSH["Acceso SSH al servidor"]
     end
 
     subgraph EXT["Servicios externos"]
@@ -72,12 +68,11 @@ flowchart TB
 
     WEB -->|"HTTP"| DNS
     MOV -->|"HTTP"| DNS
-    DNS --> APA
-    APA --> WP
-    WP --> DB
-    WP --> MEDIA
-    WP --> PAY
-    WP --> MAIL
+    DNS --> WPC
+    WPC --> DB
+    WPC --> MEDIA
+    WPC --> PAY
+    WPC --> MAIL
     OPS -->|"HTTP"| PMA
     PMA --> DB
     OPS -->|"SSH"| SSH
@@ -85,14 +80,19 @@ flowchart TB
     classDef app fill:#eef2ff,stroke:#3730a3,color:#1e1b4b;
     classDef db fill:#fff7ed,stroke:#9a3412,color:#7c2d12;
     classDef ext fill:#f1f5f9,stroke:#475569,color:#1e293b;
-    class APA,WP,MEDIA,PMA,SSH app;
+    class WPC,PMA,MEDIA,SSH app;
     class DB db;
     class PAY,MAIL ext;
 ```
 
+**Sobre los contenedores:** en producción los tres contenedores (web, base de datos y phpMyAdmin)
+corren sobre un mismo servidor con Docker. **En el laboratorio son exactamente los mismos**, pero en
+tu equipo (`127.0.0.1`). Por eso lo que se encuentra en el laboratorio aplica igual a producción.
+Kubernetes no se usa aquí, bastaría solo si la tienda creciera a varios servidores.
+
 **Debilidades de esta arquitectura (as-is):** tráfico en **HTTP sin cifrar**, un **solo servidor sin
-segmentación** (aplicación y base de datos juntas), **sin WAF ni firewall**, herramientas de
-administración (**phpMyAdmin y SSH**) accesibles desde internet, plugins de terceros **sin
+segmentación** (los contenedores comparten el mismo host y red), **sin WAF ni firewall**, herramientas
+de administración (**phpMyAdmin y SSH**) accesibles desde internet, plugins de terceros **sin
 actualizar** y base de datos **sin cifrado en reposo**. Estas debilidades se detallan en la tabla de
 las 7 capas y se tratan en el modelo de amenazas STRIDE/DREAD.
 
