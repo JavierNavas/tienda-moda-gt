@@ -40,14 +40,16 @@ flowchart TB
     PAY["Stripe (pagos)"]
     MAIL["SMTP (correos)"]
 
-    WEB -->|"HTTP"| DNS
-    MOV -->|"HTTP"| DNS
-    DNS --> WPC
-    WPC --> DB
-    WPC --> PAY
-    WPC --> MAIL
-    OPS --> PMA --> DB
-    OPS --> SSH
+    WEB -->|"HTTP/TCP 80 sin TLS"| WPC
+    MOV -->|"HTTP/TCP 80 sin TLS"| WPC
+    WEB -.->|"DNS UDP 53"| DNS
+    DNS -.->|"resuelve IP"| WPC
+    WPC -->|"MySQL/TCP 3306"| DB
+    WPC -->|"HTTPS/TCP 443"| PAY
+    WPC -->|"SMTP/TCP 587"| MAIL
+    OPS -->|"HTTP/TCP 8081"| PMA
+    PMA -->|"MySQL/TCP 3306"| DB
+    OPS -->|"SSH/TCP 22"| SSH
 
     classDef app fill:#eef2ff,stroke:#3730a3,color:#1e1b4b;
     classDef db fill:#fff7ed,stroke:#9a3412,color:#7c2d12;

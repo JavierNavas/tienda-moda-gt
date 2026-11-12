@@ -66,16 +66,17 @@ flowchart TB
         MAIL["SMTP<br/>correos de pedidos<br/>puerto 587"]
     end
 
-    WEB -->|"HTTP 80"| DNS
-    MOV -->|"HTTP 80"| DNS
-    DNS --> WPC
-    WPC -->|"SQL 3306"| DB
-    WPC --> MEDIA
-    WPC -->|"API"| PAY
-    WPC -->|"587"| MAIL
-    OPS -->|"HTTP 8081"| PMA
-    PMA -->|"SQL 3306"| DB
-    OPS -->|"SSH 22"| SSH
+    WEB -.->|"DNS UDP 53"| DNS
+    MOV -.->|"DNS UDP 53"| DNS
+    WEB -->|"HTTP/TCP 80 sin TLS"| WPC
+    MOV -->|"HTTP/TCP 80 sin TLS"| WPC
+    WPC -->|"MySQL/TCP 3306"| DB
+    WPC -->|"lectura y escritura"| MEDIA
+    WPC -->|"HTTPS/TCP 443"| PAY
+    WPC -->|"SMTP/TCP 587"| MAIL
+    OPS -->|"HTTP/TCP 8081"| PMA
+    PMA -->|"MySQL/TCP 3306"| DB
+    OPS -->|"SSH/TCP 22"| SSH
 
     classDef app fill:#eef2ff,stroke:#3730a3,color:#1e1b4b;
     classDef db fill:#fff7ed,stroke:#9a3412,color:#7c2d12;
@@ -84,6 +85,25 @@ flowchart TB
     class DB db;
     class PAY,MAIL ext;
 ```
+
+### Protocolos y puertos de comunicación
+
+Cómo se comunica cada parte en producción, de origen a destino:
+
+| # | Origen | Destino | Protocolo / puerto | Cifrado |
+|---|---|---|---|---|
+| 1 | Cliente (web / móvil) | DNS | DNS, UDP 53 | — |
+| 2 | Cliente (web / móvil) | Contenedor web | HTTP, TCP 80 | **No (sin TLS)** |
+| 3 | Contenedor web | Base de datos | MySQL, TCP 3306 | No |
+| 4 | Contenedor web | Stripe (pagos) | HTTPS, TCP 443 | Sí |
+| 5 | Contenedor web | Servidor de correo | SMTP, TCP 587 | Según configuración |
+| 6 | Administrador | phpMyAdmin | HTTP, TCP 8081 | **No (sin TLS)** |
+| 7 | phpMyAdmin | Base de datos | MySQL, TCP 3306 | No |
+| 8 | Administrador | Servidor (SSH) | SSH, TCP 22 | Sí |
+
+> El problema de seguridad se ve de inmediato: el tráfico de los clientes y de la administración
+> (filas 2 y 6) viaja en **HTTP sin cifrar**. En el rediseño seguro todo pasa a **HTTPS con TLS 1.3**
+> a través del API Gateway, y los puertos internos (3306, 8081, 22) dejan de estar expuestos.
 
 ### Detalle de cada componente
 
