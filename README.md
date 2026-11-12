@@ -26,7 +26,7 @@ flowchart TB
     OPS["Administrador / gerente"]
     DNS["DNS y dominio<br/>tiendamodagt.com"]
 
-    subgraph HOST["Servidor Cloud unico — VPS Linux"]
+    subgraph HOST["Servidor Cloud unico - VPS Linux"]
         direction TB
         subgraph DOCKER["Docker (contenedores)"]
             direction TB

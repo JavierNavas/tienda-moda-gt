@@ -48,16 +48,16 @@ flowchart TB
 
     DNS["DNS y dominio<br/>tiendamodagt.com"]
 
-    subgraph HOST["Servidor Cloud unico — VPS Linux (Ubuntu 22.04), sin firewall"]
+    subgraph HOST["Servidor Cloud unico - VPS Linux Ubuntu 22.04, sin firewall"]
         direction TB
-        subgraph DOCKER["Docker Engine — red interna 'app'"]
+        subgraph DOCKER["Docker Engine - red interna app"]
             direction TB
-            WPC["Contenedor web<br/>imagen: wordpress:php7.4-apache<br/>Apache 2.4 · PHP 7.4<br/>WordPress 6.1 + WooCommerce 7.9<br/>6 plugins de terceros (con CVE)<br/>puerto 80 → 8080"]
-            DB[("Contenedor base de datos<br/>imagen: mariadb:10.6<br/>BD 'tienda' · puerto 3306<br/>productos · clientes · pedidos<br/>sin cifrado en reposo")]
-            PMA["Contenedor phpMyAdmin<br/>imagen: phpmyadmin:latest<br/>gestor de la BD · puerto 8081"]
+            WPC["Contenedor web<br/>imagen wordpress:php7.4-apache<br/>Apache 2.4, PHP 7.4<br/>WordPress 6.1 + WooCommerce 7.9<br/>6 plugins de terceros con CVE<br/>puerto 80 a 8080"]
+            DB[("Contenedor base de datos<br/>imagen mariadb:10.6<br/>BD tienda, puerto 3306<br/>productos, clientes, pedidos<br/>sin cifrado en reposo")]
+            PMA["Contenedor phpMyAdmin<br/>imagen phpmyadmin:latest<br/>gestor de la BD, puerto 8081"]
             MEDIA["Volumen de archivos<br/>wp-content/uploads<br/>imagenes y comprobantes de pago"]
         end
-        SSH["Acceso SSH<br/>sshd · puerto 22<br/>administracion del servidor"]
+        SSH["Acceso SSH<br/>sshd, puerto 22<br/>administracion del servidor"]
     end
 
     subgraph EXT["Servicios externos"]
@@ -183,10 +183,10 @@ flowchart TB
             subgraph PUB["Subred publica"]
                 LB["Balanceador de carga"]
             end
-            subgraph SAPP["Subred privada — aplicacion"]
+            subgraph SAPP["Subred privada - aplicacion"]
                 APP["WordPress + WooCommerce<br/>actualizado y endurecido<br/>solo HTTPS, sin phpMyAdmin"]
             end
-            subgraph SDATA["Subred privada — datos"]
+            subgraph SDATA["Subred privada - datos"]
                 DB[("Base de datos administrada (RDS)<br/>cifrada AES-256 con KMS<br/>sin acceso desde internet")]
                 BK["Respaldos cifrados<br/>bucket privado"]
             end
